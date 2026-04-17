@@ -64,9 +64,22 @@ export default function Simulator({ lang }: { lang: string }) {
         customer_phone: '+52 443 100 0000',
         message: userMsg.content,
       });
+      // Extract clean response text — handle JSON strings or plain text
+      let responseText = result.response || '';
+      if (!responseText && typeof result === 'string') {
+        try {
+          const parsed = JSON.parse(result);
+          responseText = parsed.response || result;
+        } catch { responseText = result; }
+      }
+      // Clean any remaining JSON artifacts
+      responseText = responseText.replace(/```json\s*/g, '').replace(/```/g, '').trim();
+      if (responseText.startsWith('{') && responseText.includes('"response"')) {
+        try { responseText = JSON.parse(responseText).response; } catch { /* keep as is */ }
+      }
       const aiMsg: ChatMsg = {
         role: 'assistant',
-        content: result.response || 'Gracias por tu mensaje. Un momento por favor.',
+        content: responseText || 'Gracias por tu mensaje. Un momento por favor. 😊',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         action: result.action !== 'none' ? result.action : undefined,
       };

@@ -60,10 +60,17 @@ def process_customer_message(business: dict, conversation: dict, message: str) -
         f"Nuevo mensaje del cliente: {message}"
     )
     raw = _ask(system, prompt)
+    # Strip markdown code blocks if present
+    text = raw
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0]
+    elif "```" in text:
+        text = text.split("```")[1].split("```")[0]
     try:
-        return json.loads(raw)
+        return json.loads(text.strip())
     except json.JSONDecodeError:
-        return {"response": raw, "action": "none", "sentiment": "neutral"}
+        # If still can't parse, return the raw text as the response
+        return {"response": raw.replace("```json", "").replace("```", "").strip(), "action": "none", "sentiment": "neutral"}
 
 
 def generate_business_setup(category: str, business_name: str) -> dict:
