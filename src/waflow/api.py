@@ -351,28 +351,60 @@ def list_analytics(business_id: str | None = None, period: str | None = None, da
 
 @app.post("/api/v1/ai/process-message")
 def ai_process_message(req: AIProcessMessage):
-    """Simulate AI response to a customer message."""
+    """Simulate AI response to a customer message — maintains full conversation history."""
+    from datetime import datetime as dt
+
     business = store.get_item("businesses", req.business_id)
     if not business:
         raise HTTPException(404, "Business not found")
 
-    # Find conversation
+    # Find or create conversation for this business+customer pair
     convos = store.get_collection("conversations")
-    conv = {"messages": []}
+    conv = None
     for c in convos:
         if c.get("business_id") == req.business_id and c.get("customer_phone") == req.customer_phone:
             conv = c
             break
 
+    if conv is None:
+        conv = {
+            "id": f"conv-sim-{req.business_id}-{req.customer_phone.replace(' ','').replace('+','')}",
+            "business_id": req.business_id,
+            "customer_phone": req.customer_phone,
+            "messages": [],
+            "status": "active",
+            "started_at": dt.utcnow().isoformat(),
+        }
+        store.add_item("conversations", conv)
+
+    # Add customer message to conversation history BEFORE calling AI
+    conv["messages"].append({
+        "role": "customer",
+        "content": req.message,
+        "timestamp": dt.utcnow().isoformat(),
+        "message_type": "text",
+    })
+
     try:
         result = ai.process_customer_message(business, conv, req.message)
     except Exception as e:
         result = {
-            "response": f"Hola! Gracias por escribir a {business['name']}. En un momento te atendemos.",
+            "response": f"Hola! Gracias por escribir a {business['name']}. En un momento te atendemos. 😊",
             "action": "none",
             "sentiment": "neutral",
-            "error": str(e),
         }
+
+    # Add AI response to conversation history AFTER getting response
+    conv["messages"].append({
+        "role": "assistant",
+        "content": result.get("response", ""),
+        "timestamp": dt.utcnow().isoformat(),
+        "message_type": result.get("action", "text"),
+    })
+
+    # Persist full conversation so next message has context
+    store.update_item("conversations", conv["id"], {"messages": conv["messages"]})
+
     return result
 
 

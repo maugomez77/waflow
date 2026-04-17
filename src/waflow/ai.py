@@ -40,6 +40,10 @@ def process_customer_message(business: dict, conversation: dict, message: str) -
         "Usa un tono informal pero profesional, como un mexicano amigable. Usa emojis naturalmente. "
         "Puedes: agendar citas, dar informacion de servicios/precios, confirmar reservas, "
         "enviar recordatorios, cobrar, o escalar al dueno si no sabes algo.\n\n"
+        "IMPORTANTE: Lee TODA la conversacion anterior para mantener el contexto. "
+        "Si el cliente ya pidio algo o ya se acordo un precio/fecha/hora, NO lo olvides. "
+        "Si el cliente dice 'confirmado' o 'si', confirma lo que se estaba discutiendo. "
+        "NO saludes de nuevo si ya llevas conversando. Continua la conversacion naturalmente.\n\n"
         "Responde SIEMPRE en JSON:\n"
         '{"response": str (el mensaje para el cliente en espanol), '
         '"action": str (none/booking/confirmation/payment/escalation), '
@@ -50,7 +54,7 @@ def process_customer_message(business: dict, conversation: dict, message: str) -
     )
     services_str = json.dumps(business.get("services", []), ensure_ascii=False)
     hours_str = json.dumps(business.get("working_hours", {}), ensure_ascii=False)
-    msgs_str = json.dumps(conversation.get("messages", [])[-10:], default=str, ensure_ascii=False)
+    msgs_str = json.dumps(conversation.get("messages", [])[-20:], default=str, ensure_ascii=False)
 
     prompt = (
         f"Negocio: {business.get('name', '')} ({business.get('category', '')})\n"
