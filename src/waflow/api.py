@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import ai, store
+from .database import init_db
 from .models import (
     Appointment, Business, Conversation, Customer, Payment, Template,
 )
@@ -28,6 +29,12 @@ async def _load_demo_if_empty():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Create Postgres table if DATABASE_URL is set; no-op otherwise.
+    try:
+        init_db()
+    except Exception:
+        import traceback
+        traceback.print_exc()
     asyncio.create_task(_load_demo_if_empty())
     yield
 

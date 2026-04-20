@@ -1,4 +1,9 @@
-"""WaFlow JSON store — hybrid persistence layer."""
+"""WaFlow store — hybrid persistence layer.
+
+Postgres JSONB blob when DATABASE_URL is set (Render), JSON file fallback
+for local dev / CLI. Render free tier has ephemeral disk — JSON would be
+wiped on every cold start, so production must use Postgres.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +11,8 @@ import json
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+
+from .database import KVStore, SessionLocal, is_db_enabled
 
 STORE_DIR = Path.home() / ".waflow"
 STORE_FILE = STORE_DIR / "store.json"
@@ -15,19 +22,43 @@ COLLECTIONS = [
     "payments", "templates", "analytics", "webhook_events",
 ]
 
+_KV_KEY = "main"
+
+
+def _empty_store() -> dict[str, list[dict]]:
+    return {k: [] for k in COLLECTIONS}
+
 
 def _ensure_dir() -> None:
     STORE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def load_store() -> dict[str, list[dict]]:
+    if is_db_enabled():
+        with SessionLocal() as s:
+            row = s.get(KVStore, _KV_KEY)
+            if row and row.value:
+                return {**_empty_store(), **row.value}
+            return _empty_store()
     _ensure_dir()
     if STORE_FILE.exists():
         return json.loads(STORE_FILE.read_text())
-    return {k: [] for k in COLLECTIONS}
+    return _empty_store()
 
 
 def save_store(data: dict[str, list[dict]]) -> None:
+    if is_db_enabled():
+        # Round-trip through json to coerce dates/datetimes to strings (JSONB
+        # can't serialize them directly the way json.dumps(default=str) does).
+        serializable = json.loads(json.dumps(data, default=str))
+        with SessionLocal() as s:
+            row = s.get(KVStore, _KV_KEY)
+            if row:
+                row.value = serializable
+            else:
+                s.add(KVStore(key=_KV_KEY, value=serializable))
+            s.commit()
+        return
     _ensure_dir()
     STORE_FILE.write_text(json.dumps(data, indent=2, default=str))
 
