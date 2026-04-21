@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -13,29 +12,21 @@ from pydantic import BaseModel
 from . import ai, store
 from .database import init_db
 from .models import (
-    Appointment, Business, Conversation, Customer, Payment, Template,
+    Appointment, Business, Conversation, Customer, Payment, SubscriptionTier,
+    Template,
 )
-
-
-async def _load_demo_if_empty():
-    try:
-        if not store.get_collection("businesses"):
-            from . import demo_data
-            demo_data.seed_demo_data()
-    except Exception:
-        import traceback
-        traceback.print_exc()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Create Postgres table if DATABASE_URL is set; no-op otherwise.
+    # No demo seeding on startup — production must start empty and surface
+    # the empty state to the user (see `waflow demo` CLI for local dev).
     try:
         init_db()
     except Exception:
         import traceback
         traceback.print_exc()
-    asyncio.create_task(_load_demo_if_empty())
     yield
 
 
@@ -448,3 +439,56 @@ def ai_optimize_schedule(req: AIReportRequest):
         return ai.optimize_schedule(appts, business.get("working_hours", {}))
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+# --- Premium tier endpoints ---
+
+class TaxQARequest(BaseModel):
+    business_id: str
+    question: str
+
+
+PREMIUM_TIERS = {SubscriptionTier.premium.value, SubscriptionTier.pro.value}
+
+
+@app.post("/api/v1/premium/tax-qa")
+def premium_tax_qa(req: TaxQARequest):
+    """Premium-tier: CFDI 5.0 and Mexican tax compliance Q&A.
+
+    Gated on subscription_tier. Businesses on free_trial or basic get 402.
+    """
+    business = store.get_item("businesses", req.business_id)
+    if not business:
+        raise HTTPException(404, "Business not found")
+    tier = business.get("subscription_tier", "free_trial")
+    if tier not in PREMIUM_TIERS:
+        raise HTTPException(
+            402,
+            detail={
+                "error": "premium_required",
+                "current_tier": tier,
+                "upgrade_to": list(PREMIUM_TIERS),
+                "message_es": "Esta función requiere plan Premium. Actualiza para acceder al asistente fiscal CFDI 5.0.",
+                "message_en": "This feature requires Premium. Upgrade to access the CFDI 5.0 tax assistant.",
+            },
+        )
+    question = (req.question or "").strip()
+    if not question:
+        raise HTTPException(400, "question is required")
+    try:
+        return ai.answer_tax_question(business, question)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.put("/api/v1/businesses/{business_id}/tier")
+def set_business_tier(business_id: str, tier: SubscriptionTier):
+    """Upgrade or downgrade a business's subscription tier."""
+    business = store.get_item("businesses", business_id)
+    if not business:
+        raise HTTPException(404, "Business not found")
+    updated = store.update_item("businesses", business_id, {
+        "subscription_tier": tier.value,
+        "updated_at": datetime.utcnow().isoformat(),
+    })
+    return updated

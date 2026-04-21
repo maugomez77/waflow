@@ -21,10 +21,10 @@ def _get_client():
     return _client
 
 
-def _ask(system: str, prompt: str, max_tokens: int = 2048) -> str:
+def _ask(system: str, prompt: str, max_tokens: int = 2048, model: str = "claude-sonnet-4-20250514") -> str:
     client = _get_client()
     resp = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=model,
         max_tokens=max_tokens,
         system=system,
         messages=[{"role": "user", "content": prompt}],
@@ -181,3 +181,49 @@ def suggest_upsells(business: dict, customer_history: list[dict]) -> dict:
         return json.loads(raw)
     except json.JSONDecodeError:
         return {"raw": raw}
+
+
+def answer_tax_question(business: dict, question: str) -> dict:
+    """Premium-tier feature: answer CFDI 5.0 / Mexican tax compliance questions
+    grounded in the business's category and city. Uses Haiku to keep latency
+    and cost low for short Q&A turns.
+
+    Returns: {"answer_es": str, "answer_en": str, "citations": [str], "confidence": str}
+    """
+    system = (
+        "Eres AgenteFisco, asistente fiscal de WaFlow Premium para negocios mexicanos. "
+        "Respondes preguntas sobre CFDI 5.0, deducciones, RESICO, IVA, ISR, IMSS, "
+        "INFONAVIT, NOM-035, REPSE y otras obligaciones fiscales mexicanas vigentes para 2026. "
+        "Adapta la respuesta al tipo de negocio y a su ciudad. "
+        "Sé concreto, cita el artículo o regla aplicable cuando sea posible, "
+        "y SI no estás seguro, dilo y recomienda contactar a un contador.\n\n"
+        "Responde SIEMPRE en JSON:\n"
+        '{"answer_es": str (respuesta en español, máximo 6 párrafos), '
+        '"answer_en": str (English summary, max 3 paragraphs), '
+        '"citations": [str] (referencias legales: ej. "Art. 29-A CFF", "Resolución Miscelánea Fiscal 2026 regla 2.7.1.32"), '
+        '"confidence": str (high/medium/low), '
+        '"recommend_accountant": bool}'
+    )
+    prompt = (
+        f"Negocio: {business.get('name', 'Sin nombre')}\n"
+        f"Categoría: {business.get('category', 'general')}\n"
+        f"Ciudad: {business.get('city', 'morelia')}\n"
+        f"Tier: {business.get('subscription_tier', 'premium')}\n\n"
+        f"Pregunta: {question}"
+    )
+    raw = _ask(system, prompt, max_tokens=1500, model="claude-haiku-4-5-20251001")
+    text = raw
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0]
+    elif "```" in text:
+        text = text.split("```")[1].split("```")[0]
+    try:
+        return json.loads(text.strip())
+    except json.JSONDecodeError:
+        return {
+            "answer_es": raw.strip(),
+            "answer_en": "",
+            "citations": [],
+            "confidence": "low",
+            "recommend_accountant": True,
+        }

@@ -9,16 +9,18 @@ import Payments from './pages/Payments';
 import Analytics from './pages/Analytics';
 import Simulator from './pages/Simulator';
 import Setup from './pages/Setup';
+import PremiumTaxQA from './pages/PremiumTaxQA';
 
 const navItems = [
-  { path: '/', label: 'Dashboard', labelEs: 'Panel', icon: '\ud83d\udcca', section: 'Overview' },
-  { path: '/businesses', label: 'Businesses', labelEs: 'Negocios', icon: '\ud83c\udfe2', section: 'Management' },
-  { path: '/conversations', label: 'Conversations', labelEs: 'Conversaciones', icon: '\ud83d\udcac', section: 'Management' },
-  { path: '/appointments', label: 'Appointments', labelEs: 'Citas', icon: '\ud83d\udcc5', section: 'Operations' },
-  { path: '/payments', label: 'Payments', labelEs: 'Pagos', icon: '\ud83d\udcb0', section: 'Operations' },
-  { path: '/analytics', label: 'Analytics', labelEs: 'Analiticas', icon: '\ud83d\udcc8', section: 'Intelligence' },
-  { path: '/simulator', label: 'AI Simulator', labelEs: 'Simulador AI', icon: '\ud83e\udd16', section: 'Intelligence' },
-  { path: '/setup', label: 'Setup Wizard', labelEs: 'Configuracion', icon: '\u2728', section: 'Intelligence' },
+  { path: '/', label: 'Dashboard', labelEs: 'Panel', icon: '📊', section: 'Overview' },
+  { path: '/businesses', label: 'Businesses', labelEs: 'Negocios', icon: '🏢', section: 'Management' },
+  { path: '/conversations', label: 'Conversations', labelEs: 'Conversaciones', icon: '💬', section: 'Management' },
+  { path: '/appointments', label: 'Appointments', labelEs: 'Citas', icon: '📅', section: 'Operations' },
+  { path: '/payments', label: 'Payments', labelEs: 'Pagos', icon: '💰', section: 'Operations' },
+  { path: '/analytics', label: 'Analytics', labelEs: 'Analiticas', icon: '📈', section: 'Intelligence' },
+  { path: '/simulator', label: 'AI Simulator', labelEs: 'Simulador AI', icon: '🤖', section: 'Intelligence' },
+  { path: '/setup', label: 'Setup Wizard', labelEs: 'Configuracion', icon: '✨', section: 'Intelligence' },
+  { path: '/tax-qa', label: 'Tax Q&A (Premium)', labelEs: 'Fiscal (Premium)', icon: '💸', section: 'Premium' },
 ];
 
 export default function App() {
@@ -65,6 +67,7 @@ export default function App() {
           <Route path="/analytics" element={<Analytics lang={lang} />} />
           <Route path="/simulator" element={<Simulator lang={lang} />} />
           <Route path="/setup" element={<Setup lang={lang} />} />
+          <Route path="/tax-qa" element={<PremiumTaxQA lang={lang} />} />
         </Routes>
       </main>
     </div>

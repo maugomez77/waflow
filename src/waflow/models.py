@@ -36,6 +36,7 @@ class SubscriptionTier(str, Enum):
     free_trial = "free_trial"
     basic = "basic"
     pro = "pro"
+    premium = "premium"
 
 
 class BusinessStatus(str, Enum):

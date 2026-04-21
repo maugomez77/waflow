@@ -527,6 +527,56 @@ def report(
             console.print(f"  💡 {r}")
 
 
+# ─── Premium tier ───
+
+@app.command("tax-qa")
+def tax_qa(
+    business_id: str = typer.Argument(..., help="Business ID (must be on premium tier)"),
+    question: str = typer.Argument(..., help="Tax / CFDI 5.0 question"),
+):
+    """Premium: CFDI 5.0 / Mexican tax compliance Q&A for a business."""
+    business = store.get_item("businesses", business_id)
+    if not business:
+        console.print(f"[bold red]Business not found:[/] {business_id}")
+        raise typer.Exit(1)
+    tier = business.get("subscription_tier", "free_trial")
+    if tier not in ("premium", "pro"):
+        console.print(
+            f"[bold yellow]Premium required[/] — this business is on '{tier}'. "
+            f"Upgrade: waflow upgrade {business_id} --tier premium"
+        )
+        raise typer.Exit(2)
+    result = ai.answer_tax_question(business, question)
+    console.print(Panel(
+        result.get("answer_es", "(sin respuesta)"),
+        title=f"AgenteFisco — {business.get('name', business_id)}",
+        border_style="magenta",
+    ))
+    if result.get("citations"):
+        console.print("[dim]Referencias:[/]")
+        for c in result["citations"]:
+            console.print(f"  • {c}")
+    conf = result.get("confidence", "unknown")
+    console.print(f"[dim]Confianza: {conf}[/]")
+    if result.get("recommend_accountant"):
+        console.print("[yellow]Recomendación: consulta con un contador para tu caso específico.[/]")
+
+
+@app.command("upgrade")
+def upgrade(
+    business_id: str = typer.Argument(..., help="Business ID"),
+    tier: str = typer.Option("premium", "--tier", help="free_trial / basic / pro / premium"),
+):
+    """Change a business's subscription tier."""
+    business = store.get_item("businesses", business_id)
+    if not business:
+        console.print(f"[bold red]Business not found:[/] {business_id}")
+        raise typer.Exit(1)
+    old = business.get("subscription_tier", "free_trial")
+    store.update_item("businesses", business_id, {"subscription_tier": tier})
+    console.print(f"[green]✓[/] {business.get('name', business_id)}: {old} → [bold]{tier}[/]")
+
+
 # ─── Serve ───
 
 @app.command()
